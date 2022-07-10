@@ -1,0 +1,5 @@
+# use python 3.8 or greater
+matplotlib==3.5.2
+numpy==1.22.3
+tqdm==4.64.0
+scipy==1.8.0
