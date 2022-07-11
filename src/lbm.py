@@ -55,10 +55,10 @@ def calculate_density(proba_density: np.array) -> np.array:
     """
     Calculate the mass density at each given point.
     Args:
-        proba_density (ndarray): Probability density function of Lattice Boltzmann
+        proba_density (np.ndarray): Probability density function of Lattice Boltzmann
             Equation.
     Returns:
-        density (ndarray): Mass density at each position of the grid of shape
+        density (np.ndarray): Mass density at each position of the grid of shape
             (X, Y)
     """
     # Sum over the different channels of probability density function
@@ -70,7 +70,7 @@ def calculate_velocity(proba_density: np.array) -> \
     """
     Calculate the velocity field at each given point.
     Args:
-        proba_density (ndarray): Probability density function of Lattice Boltzmann
+        proba_density (np.ndarray): Probability density function of Lattice Boltzmann
             Equation.
     Returns:
         The velocity field as a numpy array of shape (2, X, Y).
@@ -91,7 +91,7 @@ def streaming(proba_density: np.array) -> None:
     Calculate the L.H.S. streaming operation of the Lattice Boltzmann equation
     by shifting the components of the probability density function along a grid.
     Args:
-        proba_density (ndarray): Probability density function of Lattice Boltzmann
+        proba_density (np.ndarray): Probability density function of Lattice Boltzmann
             Equation.
     Returns:
         None
@@ -143,11 +143,11 @@ def collision_relaxation(
     """
     Calculate the collision operation.
     Args:
-        proba_density (ndarray): Probability density function of Lattice Boltzmann
+        proba_density (np.ndarray): Probability density function of Lattice Boltzmann
         Equation.
-        velocity (ndarray): Average velocity at each position of the grid of shape
+        velocity (np.ndarray): Average velocity at each position of the grid of shape
             (2, X, Y)
-        density (ndarray): Mass density at each position of the grid of shape
+        density (np.ndarray): Mass density at each position of the grid of shape
             (X, Y).
         omega (Optional[float]): The collision frequency. Default value is 0.5
     Returns:
@@ -168,7 +168,7 @@ def plot_density(density: np.array,
     Create a heatmap of the density at each lattice point.
 
     Args:
-        density (ndarray): Mass density at each position of the grid.
+        density (np.ndarray): Mass density at each position of the grid.
         show (Optional[bool]): Whether to display the graphs or save them.
         iter (Optional[int]): Used to generate filename when saving the figures.
     Returns:
@@ -218,7 +218,7 @@ def plot_velocity_field(velocity: np.array,
     """
     Create a streamplot of the velocity field.
     Args:
-        velocity (ndarray): Average velocity at each position of the grid of shape
+        velocity (np.ndarray): Average velocity at each position of the grid of shape
             (2, X, Y).
         fig (plt.Figure) : Matplotlib figure element for the streamplot.
         ax (plt.Axes): Matplotlib axes element for the streamplot.
@@ -231,7 +231,7 @@ def plot_velocity_field(velocity: np.array,
     # Get dimensions
     X, Y = velocity.shape[1:]
 
-    x, y = np.meshgrid(range(width), range(height))
+    x, y = np.meshgrid(range(X), range(Y))
     # with the np.moveaxis the velocities will have shape (y_shape, x_shape)
     # this means that when indexing velocity_x[0] we get all the
     # x-component velocities for y = 0 and when indexing velocity_y[0]
@@ -245,8 +245,8 @@ def plot_velocity_field(velocity: np.array,
     velocity_x = np.moveaxis(velocity[0], 0, 1)
     velocity_y = np.moveaxis(velocity[1], 0, 1)
 
-    column_labels = list(range(width))
-    row_labels = list(range(height))
+    column_labels = list(range(X))
+    row_labels = list(range(Y))
 
     # Set up columns and labels
     xticks = column_labels[::5] + [column_labels[-1]]
@@ -281,8 +281,8 @@ def rigid_wall(
     """
     Apply rigid wall boundary conditions.
     Args:
-        proba_density (ndarray): Probability density function of Lattice.
-        pre_streaming_proba_density (ndarray): Probability density function before the
+        proba_density (np.ndarray): Probability density function of Lattice.
+        pre_streaming_proba_density (np.ndarray): Probability density function before the
             streaming operator is applied
         location (Optional[str]): Physical location of the boundary. For Couette flow only
             two possible positions: "upper" or "lower".
@@ -292,6 +292,7 @@ def rigid_wall(
 
     # Lower wall
     if location == "lower":
+        idx = 0
         # Channels going out
         out_channels = down_out_channels
         # Channels going in
@@ -299,6 +300,7 @@ def rigid_wall(
 
     # Upper wall
     elif location == "upper":
+        idx = -1
         # Channels going out
         out_channels = up_out_channels
         # Channels going in
@@ -317,8 +319,8 @@ def rigid_wall(
         # Set temporary variables for convenience
         temp_in, temp_out = in_channels[i], out_channels[i]
         # Index of y's that are on the lower boundary is 0
-        proba_density[temp_in, :, 0] = \
-            pre_streaming_proba_density[temp_out, :, 0]
+        proba_density[temp_in, :, idx] = \
+            pre_streaming_proba_density[temp_out, :, idx]
 
 
 def moving_wall(
@@ -330,11 +332,11 @@ def moving_wall(
     """
     Apply moving wall boundary conditions.
     Args:
-        proba_density (ndarray): Probability density function of Lattice.
-        pre_streaming_proba_density (ndarray): Probability density function before the
+        proba_density (np.ndarray): Probability density function of Lattice.
+        pre_streaming_proba_density (np.ndarray): Probability density function before the
             streaming operator is applied
-        wall_velocity (ndarray): Velocity of the moving wall as a vector.
-        density (ndarray): Mass density at each position of the grid.
+        wall_velocity (np.ndarray): Velocity of the moving wall as a vector.
+        density (np.ndarray): Mass density at each position of the grid.
         location (Optional[str]): Physical location of the boundary. For Couette flow only
             two possible positions: "upper" or "lower".
 
@@ -368,6 +370,53 @@ def moving_wall(
     else:
         raise ValueError("Invalid location given: '" + location + "'. "
                          "Allowed values are: 'upper' or 'lower'.")
+
+
+def pressure_gradient(
+        proba_density: np.array,
+        pre_streaming_proba_density: np.array,
+        density: np.array,
+        velocity: np.array,
+        density_input: float,
+        density_output: float,
+        flow: Optional[str] = "left_to_right",
+) -> None:
+    """
+    Apply periodic boundary conditions with pressure gradient.
+    Args:
+        proba_density (np.ndarray): Probability density function of Lattice.
+        pre_streaming_proba_density (np.ndarray): Probability density function before the
+            streaming operator is applied.
+        density (np.ndarray): Mass density at each position of the grid of shape (X, Y).
+        velocity (np.ndarray): Velocity at each position of the grid of shape
+            (2, X, Y).
+        density_input (float): Density value at the input.
+        density_output (float): Density value at the output.
+        flow (Optional[str]): Denotes the direction of the flow. Currently, only
+            left to right direction in x-axis is supported.
+
+    Returns:
+        None.
+    """
+    if flow == "left_to_right":
+        # Calculate equilibrium distribution
+        proba_equilibrium = calculate_equilibrium_distro(density, velocity)
+
+        # Calculate equilibrium distribution using input density and output velocity
+        equil_din_vout = calculate_equilibrium_distro(density_input, velocity)
+
+        # Calculate equilibrium distribution using output density and input velocity
+        equil_dout_vin = calculate_equilibrium_distro(density_output, velocity)
+
+        # proba density at inlet
+        proba_density[:, 0, :] = \
+            equil_din_vout[:, -2, :] + (pre_streaming_proba_density[:, -2, :] - proba_equilibrium[:, -2, :])
+        # proba density at outlet
+        proba_density[:, -1, :] = \
+            equil_dout_vin[:, 1, :] + (pre_streaming_proba_density[:, 1, :] - proba_equilibrium[:, 1, :])
+
+    else:
+        raise NotImplementedError("Flows other than left-to-right are not yet implemented.")
 
 
 if __name__ == "__main__":
