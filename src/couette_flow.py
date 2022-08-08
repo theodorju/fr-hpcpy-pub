@@ -56,8 +56,7 @@ def couette_flow(
         # Calculate velocity
         velocity = lbm.calculate_velocity(proba_density)
         # Perform collision/relaxation
-        proba_density = \
-            lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
+        lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
         # Keep the probability density function pre-streaming
         pre_stream_proba_density = proba_density.copy()
         # Streaming

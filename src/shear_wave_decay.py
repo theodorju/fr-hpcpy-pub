@@ -61,9 +61,7 @@ def shear_wave_decay_sin_density(
         velocity = lbm.calculate_velocity(proba_density)
 
         # Perform collision and update
-        proba_density = \
-            lbm.collision_relaxation(proba_density, velocity, density,
-                                     omega=omega)
+        lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
 
         # Measure the density at the monitored point
         sinus_amp.append(density[point])
@@ -154,11 +152,7 @@ def shear_wave_decay_sin_velocity(
         velocity = lbm.calculate_velocity(proba_density)
 
         # Perform collision and update
-        proba_density = \
-            lbm.collision_relaxation(proba_density,
-                                     velocity,
-                                     density,
-                                     omega=omega)
+        lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
 
         if step % 100 == 0:
             # Get the u_x velocity of one sinus wave
@@ -294,8 +288,7 @@ def shear_wave_decay_velocity_var_omega(
             velocity = lbm.calculate_velocity(proba_density)
 
             # Perform collision and update
-            proba_density = lbm.collision_relaxation(proba_density, velocity,
-                                                     density, omega=omega)
+            lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
 
             if step % 10 == 0:
                 # Get the u_x velocity of one sinus wave

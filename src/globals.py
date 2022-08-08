@@ -23,12 +23,15 @@ anti_channels = [0, 3, 4, 1, 2, 7, 8, 5, 6]
 # Useful channels for boundary conditions. Ordering matters.
 up_in_channels = (4, 7, 8)
 up_out_channels = (2, 5, 6)
+
 down_in_channels = (2, 5, 6)
 down_out_channels = (4, 7, 8)
-inlet_in_channels = (1, 5, 8)
-inlet_out_channels = (3, 6, 7)
-outlet_in_channels = (3, 6, 7)
-outlet_out_channels = (1, 5, 8)
+
+left_in_channels = (1, 5, 8)
+left_out_channels = (3, 7, 6)
+
+right_in_channels = (3, 7, 6)
+right_out_channels = (1, 5, 8)
 
 # Speed of sound squared
 c_s_squared = 1 / 3.

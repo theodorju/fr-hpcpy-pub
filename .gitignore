@@ -131,4 +131,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-data/
+# Files and directories related to sliding lid
+sliding_lid_images/

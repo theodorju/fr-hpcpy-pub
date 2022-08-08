@@ -1,6 +1,7 @@
 """Lattice Boltzmann Method core functions"""
 import matplotlib.pyplot as plt
 import os
+import numpy as np
 
 from tqdm import trange
 from typing import Optional
@@ -82,8 +83,8 @@ def calculate_velocity(proba_density: np.array) -> \
     density = calculate_density(proba_density)
 
     # Then calculate velocity field
-    return np.einsum("cij,ca->aij", proba_density, velocity_channels) / (
-            density + epsilon)
+    # return np.einsum("cij,ca->aij", proba_density, velocity_channels) / (density + epsilon)
+    return np.matmul(proba_density.T, velocity_channels).T / density
 
 
 def streaming(proba_density: np.array) -> None:
@@ -128,11 +129,10 @@ def calculate_equilibrium_distro(density: np.array,
 
     # For each channel, calculate the squared second order norm of the vector
     # of the (x, y) coordinates of the average velocity.
-    temp_v_squared = np.einsum("cij,cij -> ij", velocity, velocity)
+    temp_v_squared = np.linalg.norm(velocity, axis=0) ** 2
 
     # Return the equilibrium distribution value
-    return (weights * (density * (
-            1 + 3 * temp_v + 9./2 * temp_v ** 2 - 3./2 * temp_v_squared)).T).T
+    return (weights * (density * (1 + 3 * temp_v + 9./2 * temp_v ** 2 - 3./2 * temp_v_squared)).T).T
 
 
 def collision_relaxation(
@@ -158,7 +158,7 @@ def collision_relaxation(
     eql_proba_density = calculate_equilibrium_distro(density, velocity)
 
     # Return the new probability distribution
-    return proba_density + omega * (eql_proba_density - proba_density)
+    proba_density += omega * (eql_proba_density - proba_density)
 
 
 def plot_density(density: np.array,
@@ -261,7 +261,7 @@ def plot_velocity_field(velocity: np.array,
     # Create colorbar ticks
     cbar_ticks = [np.around(i, 2) for i in np.linspace(max_velocity, min_velocity)]
     # Generate streamplot with varying colors
-    streamplot = ax.streamplot(x, y, velocity_x, velocity_y, color=velocity_x, density=3)
+    streamplot = ax.streamplot(x, y, velocity_x, velocity_y, color=velocity_x)
     # Add colorbar
     fig.colorbar(streamplot.lines, ax=ax, ticks=cbar_ticks)
 
@@ -284,8 +284,8 @@ def rigid_wall(
         proba_density (np.ndarray): Probability density function of Lattice.
         pre_streaming_proba_density (np.ndarray): Probability density function before the
             streaming operator is applied
-        location (Optional[str]): Physical location of the boundary. For Couette flow only
-            two possible positions: "upper" or "lower".
+        location (Optional[str]): Physical location of the boundary.
+            Currently, supports all boundary possibilities: ['left, 'right', lower', 'upper'].
     Returns:
          None.
     """
@@ -293,34 +293,50 @@ def rigid_wall(
     # Lower wall
     if location == "lower":
         idx = 0
-        # Channels going out
         out_channels = down_out_channels
-        # Channels going in
         in_channels = down_in_channels
 
     # Upper wall
     elif location == "upper":
         idx = -1
-        # Channels going out
         out_channels = up_out_channels
-        # Channels going in
         in_channels = up_in_channels
 
-    # Right or left wall
-    elif location == "right" or location == "left":
-        raise NotImplementedError("Not Implemented.")
+    # Right wall
+    elif location == "right":
+        idx = -1
+        out_channels = right_out_channels
+        in_channels = right_in_channels
+
+    # Left wall
+    elif location == "left":
+        idx = 0
+        out_channels = left_out_channels
+        in_channels = left_in_channels
 
     else:
         raise ValueError("Invalid location given: '" + location + "'. "
                          "Allowed values are: 'upper', 'lower', 'right', or 'left'.")
 
-    # Loop over channels and apply boundary conditions
-    for i in range(len(in_channels)):
-        # Set temporary variables for convenience
-        temp_in, temp_out = in_channels[i], out_channels[i]
-        # Index of y's that are on the lower boundary is 0
-        proba_density[temp_in, :, idx] = \
-            pre_streaming_proba_density[temp_out, :, idx]
+    if location in ("upper", "lower"):
+        # Loop over channels and apply boundary conditions
+        for i in range(len(in_channels)):
+            # Set temporary variables for convenience
+            temp_in, temp_out = in_channels[i], out_channels[i]
+            # Index of y's that are on the lower boundary is 0
+            proba_density[temp_in, :, idx] = \
+                pre_streaming_proba_density[temp_out, :, idx]
+
+    elif location in ("right", "left"):
+        for i in range(len(in_channels)):
+            # Set temporary variables for convenience
+            temp_in, temp_out = in_channels[i], out_channels[i]
+
+            proba_density[temp_in, idx, :] = \
+                pre_streaming_proba_density[temp_out, idx, :]
+
+    else:
+        raise ValueError("Invalid location provided")
 
 
 def moving_wall(
@@ -374,7 +390,6 @@ def moving_wall(
 
 def pressure_gradient(
         proba_density: np.array,
-        pre_streaming_proba_density: np.array,
         density: np.array,
         velocity: np.array,
         density_input: float,
@@ -385,8 +400,6 @@ def pressure_gradient(
     Apply periodic boundary conditions with pressure gradient.
     Args:
         proba_density (np.ndarray): Probability density function of Lattice.
-        pre_streaming_proba_density (np.ndarray): Probability density function before the
-            streaming operator is applied.
         density (np.ndarray): Mass density at each position of the grid of shape (X, Y).
         velocity (np.ndarray): Velocity at each position of the grid of shape
             (2, X, Y).
@@ -403,17 +416,17 @@ def pressure_gradient(
         proba_equilibrium = calculate_equilibrium_distro(density, velocity)
 
         # Calculate equilibrium distribution using input density and output velocity
-        equil_din_vout = calculate_equilibrium_distro(density_input, velocity)
+        equil_din_vout = calculate_equilibrium_distro(density_input, velocity[:, -2, :])
 
         # Calculate equilibrium distribution using output density and input velocity
-        equil_dout_vin = calculate_equilibrium_distro(density_output, velocity)
+        equil_dout_vin = calculate_equilibrium_distro(density_output, velocity[:, 1, :])
 
         # proba density at inlet
         proba_density[:, 0, :] = \
-            equil_din_vout[:, -2, :] + (pre_streaming_proba_density[:, -2, :] - proba_equilibrium[:, -2, :])
+            equil_din_vout[:, :] + (proba_density[:, -2, :] - proba_equilibrium[:, -2, :])
         # proba density at outlet
         proba_density[:, -1, :] = \
-            equil_dout_vin[:, 1, :] + (pre_streaming_proba_density[:, 1, :] - proba_equilibrium[:, 1, :])
+            equil_dout_vin[:, :] + (proba_density[:, 1, :] - proba_equilibrium[:, 1, :])
 
     else:
         raise NotImplementedError("Flows other than left-to-right are not yet implemented.")

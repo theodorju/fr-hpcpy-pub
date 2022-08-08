@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 from scipy.integrate import simpson
 from typing import Optional
-from utils import theoretical_poiseuille_flow
+from utils import theoretical_poiseuille_flow, theoretical_viscosity
 
 
 def poiseuille_flow(
@@ -64,13 +64,11 @@ def poiseuille_flow(
         # Calculate velocity
         velocity = lbm.calculate_velocity(proba_density)
         # Perform collision/relaxation
-        proba_density = \
-            lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
+        lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
         # Keep the probability density function pre-streaming
         pre_streaming_proba_density = proba_density.copy()
         # Apply periodic boundary conditions with pressure gradient
         lbm.pressure_gradient(proba_density,
-                              pre_streaming_proba_density,
                               density,
                               velocity,
                               density_input,
@@ -258,13 +256,22 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    print("Running Poiseuille flow simulation for omega {}:".format(args.omega))
-
     # Grid dimensions
     dim_0, dim_1 = args.grid_size
     # Initialize the grid
     p = np.zeros((9, dim_0, dim_1))
-    print("Grid size: {} x {}".format(dim_0, dim_1))
+
+    viscosity = theoretical_viscosity(args.omega)
+
+    print("Running Poiseuille flow simulation with the following setup:"
+          f"\n\tGrid size: \t\t\t{dim_0} x {dim_1}"
+          f"\n\tCollision Frequency: \t\t{args.omega}"
+          f"\n\tViscosity: \t\t\t{viscosity:.4f}"
+          f"\n\tSteady State Density: \t\t{args.density_steady_state}"
+          f"\n\tInput Density increased by\t{args.density_input}%"
+          f"\n\tOutput Density decreased by \t{args.density_output}%"
+          f"\n\tSimulation steps: \t\t{args.steps}"
+          )
 
     # Run simulation
     poiseuille_flow(p, omega=args.omega, steps=args.steps, density_increase_percentage=args.density_input,
