@@ -1,7 +1,7 @@
 # fr-hpcpy-pub
 High Performance Computing w/ Python Project in Fluid Dynamics - Uni Freiburg
 
-<img src="https://github.com/theodorju/fr-hpcpy/blob/main/src/data/gifs/sliding_lid_velocity_field_0.1velocity_1.7omega_10000steps_300x300.gif" width="300" height="300" />
+<img src="https://github.com/theodorju/fr-hpcpy-pub/blob/main/src/data/gifs/sliding_lid_velocity_field_0.1velocity_1.7omega_10000steps_300x300.gif" width="300" height="300" />
 
 This repository contains the python implementation of the experiments mentioned in the report.
 
