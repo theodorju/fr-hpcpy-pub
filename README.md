@@ -46,7 +46,7 @@ optional arguments:
 
 ```
 
-Example call: Execute shear wave decay simulation with sinusoidal velocity initialization on a 50x50 grid with collision frequency 0.8 for 2000 simulation steps:  
+**Example call:** Execute shear wave decay simulation with sinusoidal velocity initialization on a 50x50 grid with collision frequency 0.8 for 2000 simulation steps:  
 ```
 python shear_wave_decay.py -v -o 0.8 -g 50 50 -s 2000
 ```
@@ -76,7 +76,7 @@ optional arguments:
                         For example: -g 50 50
 ```
 
-Example call: Execute Couette flow simulation with a velocity of 0.1, collision frequency equal to 0.8 on a 100x100 grid for 10000 steps. Annotate the velocity field graph with an arrow denoting the velocity and highlight the boundaries.
+**Example call:** Execute Couette flow simulation with a velocity of 0.1, collision frequency equal to 0.8 on a 100x100 grid for 10000 steps. Annotate the velocity field graph with an arrow denoting the velocity and highlight the boundaries.
 ```
 python couette_flow.py -a -v 0.1 -o 0.8 -s 10000 -g 100 100
 ```
@@ -111,7 +111,7 @@ Description of arguments:
                         For example: -g 50 50
 ```
 
-Example call: Execute Poiseuille flow simulation for 10000 steps on a 50x50 grid with collision frequency equal to 0.8. Use default values for the rest of the arguments.
+**Example call:** Execute Poiseuille flow simulation for 10000 steps on a 50x50 grid with collision frequency equal to 0.8. Use default values for the rest of the arguments.
 ```
 python poiseuille_flow.py -o 0.8 -dss 0.01 -s 10000 -g 50 50
 ```
@@ -137,7 +137,7 @@ Description of arguments:
                         Space separated list of grid size (dim_0, dim_1). 
                         For example: -g 50 50.
 ```
-Example call: Execute the sliding lid simulation on a 300x300 grid with collision frequency equal to 1.7, lid velocity equal to 0.1  for 10000 steps.
+**Example call:** Execute the sliding lid simulation on a 300x300 grid with collision frequency equal to 1.7, lid velocity equal to 0.1  for 10000 steps.
 ```
 python sliding_lid.py -o 1.7 -v 0.1 -s 10000 -g 300 300
 ```
@@ -170,7 +170,7 @@ Description of arguments:
                         The simulation steps. Default value is 10000
 ```
 
-Example call: Execute the sliding lid simulation in parallel on a 300x300 grid with collision frequency equal to 1.7, lid velocity equal to 0.1  for 10000 steps. Use 4 cores and 2x2 discretization.
+**Example call:** Execute the sliding lid simulation in parallel on a 300x300 grid with collision frequency equal to 1.7, lid velocity equal to 0.1  for 10000 steps. Use 4 cores and 2x2 discretization.
 ```
 mpirun -n 4 python sliding_lid_parallel.py -g 300 300 -d 2 2 -o 1.7 -s 10000 -v 0.1
 ```
