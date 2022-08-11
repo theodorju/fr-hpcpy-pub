@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 import argparse
 import lbm
@@ -18,13 +17,10 @@ def save_mpiio(comm, fn, g_kl):
 
     Parameters
     ----------
-    comm
-        MPI communicator.
-    fn : str
-        File name.
-    g_kl : array_like
-        Portion of the array on this MPI processes. This needs to be a
-        two-dimensional array.
+    comm (MPI.Comm):  MPI communicator.
+    fn (str): File name
+    g_kl (ndarray): Portion of the array on this MPI processes.
+        This needs to be a two-dimensional array.
     """
     from numpy.lib.format import dtype_to_descr, magic
     magic_str = magic(1, 0)
@@ -78,39 +74,47 @@ def communicate(proba_density: np.array, cartcomm: MPI.Cartcomm, all_source_dest
     Returns:
         None.
     """
+
+    # Unpack destinations and sources
     r_source, r_dest, l_source, l_dest, u_source, u_dest, d_source, d_dest = all_source_dest
 
-    # send to the left, receive from the right
-    recvbuf = proba_density[:, -1, :].copy()
-    cartcomm.Sendrecv(proba_density[:, 1, :].copy(),
-                      l_dest,
-                      recvbuf=recvbuf,
-                      source=l_source)
-    proba_density[:, -1, :] = recvbuf
-
-    # send to right, receive from the left
-    recvbuf = proba_density[:, 0, :].copy()
-    comm.Sendrecv(proba_density[:, -2, :].copy(),
-                  r_dest,
-                  recvbuf=recvbuf,
-                  source=r_source)
-    proba_density[:, 0, :] = recvbuf
+    # send to up, receive from down
+    # intermediate buffer otherwise the value of proba density is not populated correctly
+    # this is expected to increase the memory footprint
+    buffer = np.ascontiguousarray(proba_density[:, :, 0])
+    comm.Sendrecv(np.ascontiguousarray(proba_density[:, :, -2]),
+                  u_dest,
+                  recvbuf=buffer,
+                  source=u_source)
+    # Populate proba density based on buffer
+    proba_density[:, :, 0] = buffer
 
     # send to down, receive from up
-    recvbuf = proba_density[:, :, -1].copy()
-    comm.Sendrecv(proba_density[:, :, 1].copy(),
+    buffer = np.ascontiguousarray(proba_density[:, :, -1])
+    comm.Sendrecv(np.ascontiguousarray(proba_density[:, :, 1]),
                   d_dest,
-                  recvbuf=recvbuf,
+                  recvbuf=buffer,
                   source=d_source)
-    proba_density[:, :, -1] = recvbuf
+    # Populate proba density based on buffer
+    proba_density[:, :, -1] = buffer
 
-    # send to up, receive from down
-    recvbuf = proba_density[:, :, 0].copy()
-    comm.Sendrecv(proba_density[:, :, -2].copy(),
-                  u_dest,
-                  recvbuf=recvbuf,
-                  source=u_source)
-    proba_density[:, :, 0] = recvbuf
+    # send to the left, receive from the right
+    buffer = np.ascontiguousarray(proba_density[:, -1, :])
+    cartcomm.Sendrecv(np.ascontiguousarray(proba_density[:, 1, :]),
+                      l_dest,
+                      recvbuf=buffer,
+                      source=l_source)
+    # Populate proba density based on buffer
+    proba_density[:, -1, :] = buffer
+
+    # send to right, receive from the left
+    buffer = np.ascontiguousarray(proba_density[:, 0, :])
+    comm.Sendrecv(np.ascontiguousarray(proba_density[:, -2, :]),
+                  r_dest,
+                  recvbuf=buffer,
+                  source=r_source)
+    # Populate proba density based on buffer
+    proba_density[:, 0, :] = buffer
 
 
 if __name__ == "__main__":
@@ -120,9 +124,18 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "-b",
+        "--benchmarking",
+        help="Pass this argument if measuring execution time to avoid saving velocity arrays."
+             "Default value False.",
+        default=False,
+        action="store_true"
+    )
+
+    parser.add_argument(
         "-o",
         "--omega",
-        help="The collision frequency. Default value is 0.8.",
+        help="The collision frequency. Default value is 1.7.",
         type=float,
         default=1.7
     )
@@ -164,6 +177,9 @@ if __name__ == "__main__":
     # Parse arguments
     args = parser.parse_args()
 
+    # Benchmarking
+    benchmarking = args.benchmarking
+
     # Collision frequency
     omega = args.omega
 
@@ -172,15 +188,33 @@ if __name__ == "__main__":
     size = comm.Get_size()
     rank = comm.Get_rank()
 
+    # Unpack discretization and domain size
     nsub_x, nsub_y = args.discretization
+    dim_x, dim_y = args.grid_size
 
-    # Validate that correct discretization is choosen
+    # Validate that correct discretization is chosen
     err_msg = f"Invalid discretization given. It should be {nsub_x} x {nsub_y} = {size}"
     assert nsub_x * nsub_y == size, err_msg
 
+    # Define lid velocity
+    lid_velocity = np.array([args.velocity, 0.])
+
     # Print information on rank 0
     if rank == 0:
+        # Calculate viscosity
+        viscosity = theoretical_viscosity(omega)
+        # Calculate reynolds number
+        reynolds = dim_x * args.velocity / viscosity
+
         print(f"Parallel execution of sliding lid in {size} processes.")
+        print(f"Parallel execution of sliding lid in {size} processes and the following setup:"
+              f"\n\tGrid size: \t\t{dim_x} x {dim_y}"
+              f"\n\tCollision Frequency: \t{args.omega}"
+              f"\n\tViscosity: \t\t{viscosity:.4f}"
+              f"\n\tLid velocity: \t\t{args.velocity}"
+              f"\n\tReynolds number: \t{reynolds:.2f}"
+              f"\n\tSimulation steps: \t{args.steps}"
+              )
 
     # Create a cartesian communicator
     cartcomm = comm.Create_cart(dims=[nsub_x, nsub_y],
@@ -192,16 +226,16 @@ if __name__ == "__main__":
     coords = cartcomm.Get_coords(rank)
 
     # Define source and destination for each core
-    # Send to right, receive from left
-    r_source, r_dest = cartcomm.Shift(0, 1)
-    # Send to left, receive from right
-    l_source, l_dest = cartcomm.Shift(0, -1)
     # Send to up, receive from down
     u_source, u_dest = cartcomm.Shift(1, 1)
     # Send to down, receive from up
     d_source, d_dest = cartcomm.Shift(1, -1)
+    # Send to right, receive from left
+    r_source, r_dest = cartcomm.Shift(0, 1)
+    # Send to left, receive from right
+    l_source, l_dest = cartcomm.Shift(0, -1)
 
-    # Gather all sources and destinations
+    # Gather all sources and destinations into a single list
     all_source_dest = [
         r_source, r_dest,
         l_source, l_dest,
@@ -209,15 +243,13 @@ if __name__ == "__main__":
         d_source, d_dest
     ]
 
-    # Add ghost cells
-    # since "periods" is set to False in the cartesian communicator
-    # the destinations of domains in the edges are set to -2
-    dim_x, dim_y = args.grid_size
-
-    # For now assume it can be divided perfectly
+    # Calculate the initial size of the subspaces in each process without ghost cells
     proc_dim_x = dim_x // nsub_x
     proc_dim_y = dim_y // nsub_y
 
+    # Add ghost cells
+    # since "periods" is set to False in the cartesian communicator
+    # the destinations of domains in the edges are set to -2
     # Temp. variables to help locate the subspace and properly add ghost cells
     left_most = l_dest < 0
     right_most = r_dest < 0
@@ -243,55 +275,53 @@ if __name__ == "__main__":
 
     # The following cases require special handling in case of not directly discretized grids
     # Rightmost needs special attention in case the grid is not directly discretized
-    # with the chosen discretization scheme, equation derived from diffusion equation example
-    if right_most:          # ranks 4 and 5 in example
+    # with the chosen discretization scheme, equation derived from the solution of the diffusion
+    # equation example given in Learning Module 4: Parallelization
+    if right_most:          # ranks 4, 5
         proc_dim_x = dim_x - proc_dim_x * (nsub_x - 1)
 
     # Topmost subspace needs special treatment in case the grid is not directly discretized
-    # with the chosen discretization scheme, equation derived from diffusion equation example
-    if top_most:  # ranks 1, 3, 5
+    # with the chosen discretization scheme, equation derived from the solution of the diffusion
+    # equation example given in Learning Module 4: Parallelization
+    if top_most:            # ranks 1, 3, 5
         proc_dim_y = dim_y - proc_dim_y * (nsub_y - 1)
 
     # At this point the grid is correctly divided into subspaces
-    # Define the active slices here to be used later when the velocities are gathered
+    # Define the active limits here to be used later when the velocities are gathered
     # Note that no ghost cells are added up to this point so slices will start from zero
-    active_subspace_x = slice(0, proc_dim_x)
-    active_subspace_y = slice(0, proc_dim_y)
+    x_start, x_end = 0, proc_dim_x
+    y_start, y_end = 0, proc_dim_y
 
     # Add space for ghost cells
     # If it's not the rightmost subspace, add ghost cell on the right
     if not right_most:      # ranks 0, 1, 2, 3
+        # Add ghost cell
         proc_dim_x += 1
-        # Update active subspace to account for this ghost cell
-        active_subspace_x = slice(0, proc_dim_x - 1)
+        # Update active limits to account for this ghost cell
+        x_start, x_end = 0, proc_dim_x - 1
 
     # If it's not the left most subspace, add space for ghost cells on the left
     if not left_most:       # ranks: 2, 3, 4, 5
+        # Add ghost cell
         proc_dim_x += 1
-        # Update active subspace to account for this ghost cell
-        active_subspace_x = slice(1, proc_dim_x + 1)
+        # Update active limits to account for this ghost cell
+        x_start, x_end = 1, proc_dim_x + 1
 
     # If it's not the topmost subspace, add space for ghost cells on the top
     if not top_most:        # ranks 0, 2, 4
+        # Add ghost cell
         proc_dim_y += 1
-        # Update active subspace to account for this ghost cell
-        active_subspace_y = slice(0, proc_dim_y - 1)
+        # Update active limits to account for this ghost cell
+        y_start, y_end = 0, proc_dim_y - 1
 
     # If it's not the bottom most subspace, add space for ghost cells on the bottom
     if not bottom_most:     # ranks 1, 2, 3
+        # Add ghost cell
         proc_dim_y += 1
-        # Update active subspace to account for this ghost cell
-        active_subspace_y = slice(1, proc_dim_y + 1)
+        # Update active limits to account for this ghost cell
+        y_start, y_end = 1, proc_dim_y + 1
 
-    print(f'Rank: {rank} is located at coordinates ({coords[0]},{coords[1]})'
-          f'The grid with the ghost cells is {proc_dim_x}x{proc_dim_y}')
-
-    # Define lid velocity
-    lid_velocity = np.array([args.velocity, 0.])
-    # Calculate viscosity
-    viscosity = theoretical_viscosity(omega)
-    # Calculate reynolds number
-    reynolds = dim_x * args.velocity / viscosity
+    print(f'Rank: {rank} is located at coordinates ({coords[0]},{coords[1]})')
 
     # Initialize density ρ(0) = 1.0 at time t=0
     density = np.ones((proc_dim_x, proc_dim_y), dtype=float)
@@ -300,12 +330,8 @@ if __name__ == "__main__":
     # Initialize proba density to equilibrium
     proba_density = lbm.calculate_equilibrium_distro(density, velocity)
 
-    # Iterate over steps
+    # Iterate over steps, density and velocity are already calculated for the first iteration
     for step in range(args.steps):
-
-        # Write message on screen
-        if step % 10 == 0:
-            sys.stdout.write(f" >>>>>> Step {step}/{args.steps} <<<<<<\r")
 
         # Communicate
         communicate(proba_density, cartcomm, all_source_dest)
@@ -335,8 +361,7 @@ if __name__ == "__main__":
         # Perform collision and relaxation
         lbm.collision_relaxation(proba_density, velocity, density, omega=omega)
 
-    # Once simulation is complete, save velocity matrix from each rank
-    # np.save(f"velocity_{rank}", velocity[:, active_subspace_x, active_subspace_y])
-
-    save_mpiio(cartcomm, 'ux.npy', velocity[0, active_subspace_x, active_subspace_y])
-    save_mpiio(cartcomm, 'uy.npy', velocity[1, active_subspace_x, active_subspace_y])
+    # If not measuring execution time, save velocity arrays to be visualized later
+    if not benchmarking:
+        save_mpiio(cartcomm, 'ux.npy', velocity[0, x_start:x_end, y_start:y_end])
+        save_mpiio(cartcomm, 'uy.npy', velocity[1, x_start:x_end, y_start:y_end])

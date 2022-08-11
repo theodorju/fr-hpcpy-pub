@@ -105,7 +105,7 @@ def couette_flow(
         _ = ax[0].axhline(0 - 0.5,
                           color="black",
                           linewidth=3)
-        _ = ax[0].arrow(40, 103, 20, 0,
+        _ = ax[0].arrow(x_shape // 2 - 10, y_shape + 3, 20, 0,
                         width=0.5,
                         color="red",
                         edgecolor=None,
@@ -171,9 +171,10 @@ if __name__ == "__main__":
                         '--grid_size',
                         nargs='+',
                         help='Space separated list of grid size (dim_0, dim_1). For '
-                             'example: -g 50 50',
+                             'example: -g 100 100.'
+                             'Default values are 100 x 100',
                         type=int,
-                        default=(50, 50))
+                        default=(100, 100))
 
     args = parser.parse_args()
 
