@@ -206,7 +206,9 @@ def plot_density(density: np.array,
         if not path_exists:
             # Create path if it does not exist
             os.makedirs("data")
+        print("Saving plots under /data")
         plt.savefig('data/density_{}'.format(iter))
+        plt.show()
 
 
 def plot_velocity_field(velocity: np.array,
@@ -448,4 +450,4 @@ if __name__ == "__main__":
         streaming(p_stream)
         density = calculate_density(p_stream)
         v = calculate_velocity(p_stream)
-        plot_density(density, i, True)
+        plot_density(density, i, False)

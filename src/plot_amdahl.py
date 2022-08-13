@@ -1,8 +1,15 @@
+"""
+Generate benchmarking plots.
+All timings are from this google sheet:
+    https://docs.google.com/spreadsheets/d/1kO4LfrUYbkT5su9cKMI7Ee0WcFy7c6IN3ehic8QqP48/edit#gid=0
+"""
+
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import os
 
+# Matplotlib properties
 font = {'size': 15}
 
 matplotlib.rc('font', **font)
