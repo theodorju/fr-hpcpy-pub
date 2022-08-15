@@ -83,7 +83,6 @@ def calculate_velocity(proba_density: np.array) -> \
     density = calculate_density(proba_density)
 
     # Then calculate velocity field
-    # return np.einsum("cij,ca->aij", proba_density, velocity_channels) / (density + epsilon)
     return np.matmul(proba_density.T, velocity_channels).T / density
 
 
@@ -240,7 +239,7 @@ def plot_velocity_field(velocity: np.array,
     # we get all the y-component velocities for y = 0.
     # In its general form it holds that:
     #   - velocity_x[y_index, x_index]
-    #   - velocity_y[y_index, i_index]
+    #   - velocity_y[y_index, x_index]
     # To get all the velocities for a given x, e.g. x = 0
     # we have to index as follows: velocity_x[:, x_index]
     # the same holds for velocity_y. I.E. velocity_y[:, x_index]

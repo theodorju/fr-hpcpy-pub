@@ -278,13 +278,13 @@ if __name__ == "__main__":
     # with the chosen discretization scheme, equation derived from the solution of the diffusion
     # equation example given in Learning Module 4: Parallelization
     if right_most:          # ranks 4, 5
-        proc_dim_x = dim_x - proc_dim_x * (nsub_x - 1)
+        proc_dim_x = dim_x - proc_dim_x * (nsub_x - 1)  # -1 because the rest are equally distributed
 
     # Topmost subspace needs special treatment in case the grid is not directly discretized
     # with the chosen discretization scheme, equation derived from the solution of the diffusion
     # equation example given in Learning Module 4: Parallelization
     if top_most:            # ranks 1, 3, 5
-        proc_dim_y = dim_y - proc_dim_y * (nsub_y - 1)
+        proc_dim_y = dim_y - proc_dim_y * (nsub_y - 1)  # -1 because the rest are equally distributed
 
     # At this point the grid is correctly divided into subspaces
     # Define the active limits here to be used later when the velocities are gathered
